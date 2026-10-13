@@ -6,11 +6,12 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.noxcrew.noxesium.api.NoxesiumApi;
 import com.noxcrew.noxesium.api.component.GameComponents;
 import com.noxcrew.noxesium.core.fabric.feature.SyncGuiScale;
+import com.noxcrew.noxesium.core.fabric.feature.ZoomModule;
 import com.noxcrew.noxesium.core.registry.CommonGameComponentTypes;
-import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.PrioritizeChunkUpdates;
+import net.minecraft.client.gui.components.AbstractWidget;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -24,16 +25,40 @@ import org.spongepowered.asm.mixin.injection.At;
 @Mixin(OptionInstance.class)
 public abstract class OptionInstanceMixin<T> {
 
+    @ModifyReturnValue(
+            method = "createButton(Lnet/minecraft/client/Options;)Lnet/minecraft/client/gui/components/AbstractWidget;",
+            at = @At("RETURN"))
+    private AbstractWidget disableFovSliderWhenZoomLocked(AbstractWidget widget) {
+        var options = Minecraft.getInstance().options;
+        if (options == null) return widget;
+
+        // Disable FOV slider while server controlled zoom is active
+        if (((Object) this) == options.fov()) {
+            var zoom = NoxesiumApi.getInstance().getFeatureOrNull(ZoomModule.class);
+            if (zoom != null && zoom.shouldLockClientFov()) {
+                widget.active = false;
+            }
+        }
+
+        return widget;
+    }
+
     @WrapOperation(
             method = "set",
             at =
                     @At(
                             value = "FIELD",
                             target =
-                                    "Lnet/minecraft/client/OptionInstance;onValueUpdate:Ljava/util/function/Consumer;"))
-    private Consumer<T> updateNoxesiumOptions(OptionInstance<T> instance, Operation<Consumer<T>> original) {
+                                    "Lnet/minecraft/client/OptionInstance;onValueUpdate:Lnet/minecraft/client/OptionInstance$ValueUpdateListener;"))
+    private OptionInstance.ValueUpdateListener<? super T> updateNoxesiumOptions(
+            OptionInstance<T> instance, Operation<OptionInstance.ValueUpdateListener<? super T>> original) {
         var options = Minecraft.getInstance().options;
-        if (instance == options.touchscreen() || instance == options.notificationDisplayTime()) {
+        if (instance == options.notificationDisplayTime()
+                || instance == options.chatVisibility()
+                || instance == options.chatWidth()
+                || instance == options.chatHeightUnfocused()
+                || instance == options.fov()
+                || instance == options.fovEffectScale()) {
             NoxesiumApi.getInstance().getFeatureOptional(SyncGuiScale.class).ifPresent(SyncGuiScale::syncGuiScale);
         }
         return original.call(instance);

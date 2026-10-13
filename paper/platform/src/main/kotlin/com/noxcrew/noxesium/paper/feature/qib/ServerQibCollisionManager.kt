@@ -32,7 +32,7 @@ public class ServerQibCollisionManager(player: Player, spatialTree: SpatialTree)
             is QibEffect.PlaySound -> {
                 (player as? ServerPlayer)?.connection?.send(
                     ClientboundSoundEntityPacket(
-                        Holder.Direct(
+                        Holder.direct(
                             SoundEvent.createVariableRangeEvent(
                                 Identifier.fromNamespaceAndPath(effect.namespace, effect.path),
                             ),
@@ -86,6 +86,7 @@ public class ServerQibCollisionManager(player: Player, spatialTree: SpatialTree)
                         ParticleTypes.EXPLOSION,
                         SoundEvents.GENERIC_EXPLODE,
                         WeightedList.of(),
+                        false,
                     ),
                 )
             }

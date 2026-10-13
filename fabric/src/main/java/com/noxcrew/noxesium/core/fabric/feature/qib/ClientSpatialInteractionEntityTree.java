@@ -37,8 +37,8 @@ public class ClientSpatialInteractionEntityTree extends SpatialTree {
     }
 
     @Override
-    public void rebuild() {
-        if (!needsRebuilding.get() || rebuilding.get()) return;
+    protected void rebuild() {
+        if (rebuilding.get()) return;
 
         // Ensure the world exists before calling the super-method as it calls getEntity!
         var world = Minecraft.getInstance().level;
@@ -56,7 +56,7 @@ public class ClientSpatialInteractionEntityTree extends SpatialTree {
                         + staticEntities.size() + ", A" + pendingEntities.size() + ", R"
                         + removedEntities.size() + "]");
                 NoxesiumMod.getInstance().ensureMain(() -> {
-                    Minecraft.getInstance().getChatListener().handleSystemMessage(message, false);
+                    Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(message);
                 });
             }
 

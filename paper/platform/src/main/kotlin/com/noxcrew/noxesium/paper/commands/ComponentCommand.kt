@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.BoolArgumentType
 import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.FloatArgumentType
 import com.mojang.brigadier.arguments.IntegerArgumentType
+import com.mojang.brigadier.arguments.LongArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.ArgumentBuilder
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
@@ -496,6 +497,19 @@ private fun <T : ArgumentBuilder<CommandSourceStack, *>> T.configureComponentCom
                                     )
                                 }
 
+                        type == CommonGameComponentTypes.DEBUG_ENTRIES_ALLOWED ||
+                            type == CommonGameComponentTypes.DEBUG_ENTRIES_DENIED ||
+                            type == CommonGameComponentTypes.DEBUG_ENTRIES_OVERRIDE ->
+                            Commands
+                                .argument("value", StringArgumentType.string())
+                                .executes { ctx ->
+                                    configurer.set(
+                                        ctx,
+                                        type as NoxesiumComponentType<List<String>>,
+                                        ctx.getArgument("value", String::class.java).split(","),
+                                    )
+                                }
+
                         String::class.java.isAssignableFrom(type.clazz) ->
                             Commands
                                 .argument("value", StringArgumentType.string())
@@ -537,6 +551,17 @@ private fun <T : ArgumentBuilder<CommandSourceStack, *>> T.configureComponentCom
                                         ctx,
                                         type as NoxesiumComponentType<Double>,
                                         DoubleArgumentType.getDouble(ctx, "value"),
+                                    )
+                                }
+
+                        java.lang.Long::class.java.isAssignableFrom(type.clazz) ->
+                            Commands
+                                .argument("value", LongArgumentType.longArg())
+                                .executes { ctx ->
+                                    configurer.set(
+                                        ctx,
+                                        type as NoxesiumComponentType<Long>,
+                                        LongArgumentType.getLong(ctx, "value"),
                                     )
                                 }
 
@@ -595,6 +620,12 @@ private fun <T : ArgumentBuilder<CommandSourceStack, *>> T.configureComponentCom
                                         CraftItemStack.unwrap(ctx.getArgument("value", org.bukkit.inventory.ItemStack::class.java)),
                                     )
                                 }
+
+                        Enum::class.java.isAssignableFrom(type.clazz) -> {
+                            // Enums use a literal for every value!
+                            forEnum(type.clazz as Class<out Enum<*>>)
+                            continue
+                        }
 
                         Unit::class.java.isAssignableFrom(type.clazz) -> {
                             // Units are special and have no more parameters!

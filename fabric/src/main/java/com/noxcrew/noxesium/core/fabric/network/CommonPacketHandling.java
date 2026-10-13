@@ -1,5 +1,6 @@
 package com.noxcrew.noxesium.core.fabric.network;
 
+import com.mojang.blaze3d.Blaze3D;
 import com.noxcrew.noxesium.api.NoxesiumApi;
 import com.noxcrew.noxesium.api.component.GameComponents;
 import com.noxcrew.noxesium.api.component.NoxesiumComponentPatch;
@@ -9,15 +10,18 @@ import com.noxcrew.noxesium.api.feature.NoxesiumFeature;
 import com.noxcrew.noxesium.api.nms.serialization.ComponentSerializerRegistry;
 import com.noxcrew.noxesium.api.registry.NoxesiumRegistries;
 import com.noxcrew.noxesium.api.registry.NoxesiumRegistry;
+import com.noxcrew.noxesium.core.fabric.feature.ZoomModule;
 import com.noxcrew.noxesium.core.fabric.feature.sound.EntityNoxesiumSoundInstance;
 import com.noxcrew.noxesium.core.fabric.feature.sound.NoxesiumSoundInstance;
 import com.noxcrew.noxesium.core.fabric.feature.sound.NoxesiumSoundModule;
 import com.noxcrew.noxesium.core.network.CommonPackets;
+import com.noxcrew.noxesium.core.network.clientbound.ClientboundApplyZoomPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundCustomSoundModifyPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundCustomSoundStartPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundCustomSoundStopPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundGlidePacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundOpenLinkPacket;
+import com.noxcrew.noxesium.core.network.clientbound.ClientboundResetZoomPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundUpdateEntityComponentsPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundUpdateGameComponentsPacket;
 import java.util.List;
@@ -152,15 +156,15 @@ public class CommonPacketHandling extends NoxesiumFeature {
                         // for multiple lines
                         var screen = new ConfirmLinkScreen(
                                 (result) -> {
-                                    if (result) Util.getPlatform().openUri(uri);
-                                    minecraft.setScreen(null);
+                                    if (result) Blaze3D.openUri(uri);
+                                    minecraft.gui.setScreen(null);
                                 },
                                 net.minecraft.network.chat.Component.empty(),
                                 NonWrappingComponentSerializer.INSTANCE.serialize(text),
                                 uri,
                                 CommonComponents.GUI_CANCEL,
                                 true);
-                        minecraft.setScreen(screen);
+                        minecraft.gui.setScreen(screen);
                     } catch (Exception e) {
                         NoxesiumApi.getLogger().warn("Failed to open link {}", packet.url(), e);
                     }
@@ -176,9 +180,32 @@ public class CommonPacketHandling extends NoxesiumFeature {
                     player.startFallFlying();
                 }
             } else {
-                player.stopFallFlying();
+                if (player.isFallFlying()) {
+                    player.stopFallFlying();
+                }
             }
         });
+
+        CommonPackets.CLIENT_APPLY_ZOOM.addListener(
+                this, ClientboundApplyZoomPacket.class, (reference, packet, ignored3) -> {
+                    if (!reference.isRegistered()) return;
+                    var zoom = NoxesiumApi.getInstance().getFeatureOrNull(ZoomModule.class);
+                    if (zoom == null) return;
+                    zoom.applyZoom(
+                            packet.zoom(),
+                            packet.transitionTicks(),
+                            packet.easingType(),
+                            packet.keepHandStationary(),
+                            packet.fov().map(Integer::floatValue).orElse(null));
+                });
+
+        CommonPackets.CLIENT_RESET_ZOOM.addListener(
+                this, ClientboundResetZoomPacket.class, (reference, packet, ignored3) -> {
+                    if (!reference.isRegistered()) return;
+                    var zoom = NoxesiumApi.getInstance().getFeatureOrNull(ZoomModule.class);
+                    if (zoom == null) return;
+                    zoom.reset(packet.ticks(), packet.easingType());
+                });
     }
 
     /**

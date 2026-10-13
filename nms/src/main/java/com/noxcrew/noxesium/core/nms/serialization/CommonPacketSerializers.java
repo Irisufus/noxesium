@@ -7,15 +7,20 @@ import com.noxcrew.noxesium.api.nms.codec.NoxesiumCodecs;
 import com.noxcrew.noxesium.api.nms.codec.NoxesiumStreamCodecs;
 import com.noxcrew.noxesium.api.nms.serialization.SerializableRegistries;
 import com.noxcrew.noxesium.api.registry.NoxesiumRegistries;
+import com.noxcrew.noxesium.core.feature.EasingType;
+import com.noxcrew.noxesium.core.network.clientbound.ClientboundApplyZoomPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundCustomSoundModifyPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundCustomSoundStartPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundCustomSoundStopPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundGlidePacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundOpenLinkPacket;
+import com.noxcrew.noxesium.core.network.clientbound.ClientboundResetZoomPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundUpdateEntityComponentsPacket;
 import com.noxcrew.noxesium.core.network.clientbound.ClientboundUpdateGameComponentsPacket;
 import com.noxcrew.noxesium.core.network.serverbound.ServerboundClientSettingsPacket;
+import com.noxcrew.noxesium.core.network.serverbound.ServerboundClientSettingsPacketV2;
 import com.noxcrew.noxesium.core.network.serverbound.ServerboundGlidePacket;
+import com.noxcrew.noxesium.core.network.serverbound.ServerboundLandPacket;
 import com.noxcrew.noxesium.core.network.serverbound.ServerboundMouseButtonClickPacket;
 import com.noxcrew.noxesium.core.network.serverbound.ServerboundQibTriggeredPacket;
 import com.noxcrew.noxesium.core.network.serverbound.ServerboundRiptidePacket;
@@ -40,6 +45,12 @@ public class CommonPacketSerializers {
                         NoxesiumStreamCodecs.CLIENT_SETTINGS,
                         ServerboundClientSettingsPacket::settings,
                         ServerboundClientSettingsPacket::new));
+        registerSerializer(
+                ServerboundClientSettingsPacketV2.class,
+                StreamCodec.composite(
+                        NoxesiumStreamCodecs.CLIENT_SETTINGS_V2,
+                        ServerboundClientSettingsPacketV2::settings,
+                        ServerboundClientSettingsPacketV2::new));
         registerSerializer(
                 ServerboundQibTriggeredPacket.class,
                 StreamCodec.composite(
@@ -66,6 +77,7 @@ public class CommonPacketSerializers {
                 ServerboundGlidePacket.class,
                 StreamCodec.composite(
                         ByteBufCodecs.BOOL, ServerboundGlidePacket::gliding, ServerboundGlidePacket::new));
+        registerSerializer(ServerboundLandPacket.class, StreamCodec.unit(ServerboundLandPacket.INSTANCE));
         registerSerializer(
                 ClientboundCustomSoundModifyPacket.class,
                 StreamCodec.composite(
@@ -140,5 +152,27 @@ public class CommonPacketSerializers {
                 ClientboundGlidePacket.class,
                 StreamCodec.composite(
                         ByteBufCodecs.BOOL, ClientboundGlidePacket::gliding, ClientboundGlidePacket::new));
+        registerSerializer(
+                ClientboundApplyZoomPacket.class,
+                StreamCodec.composite(
+                        ByteBufCodecs.FLOAT,
+                        ClientboundApplyZoomPacket::zoom,
+                        ByteBufCodecs.VAR_INT,
+                        ClientboundApplyZoomPacket::transitionTicks,
+                        NoxesiumStreamCodecs.forEnum(EasingType.class),
+                        ClientboundApplyZoomPacket::easingType,
+                        ByteBufCodecs.BOOL,
+                        ClientboundApplyZoomPacket::keepHandStationary,
+                        ByteBufCodecs.optional(ByteBufCodecs.VAR_INT),
+                        ClientboundApplyZoomPacket::fov,
+                        ClientboundApplyZoomPacket::new));
+        registerSerializer(
+                ClientboundResetZoomPacket.class,
+                StreamCodec.composite(
+                        ByteBufCodecs.optional(ByteBufCodecs.VAR_INT),
+                        ClientboundResetZoomPacket::ticks,
+                        NoxesiumStreamCodecs.forEnum(EasingType.class),
+                        ClientboundResetZoomPacket::easingType,
+                        ClientboundResetZoomPacket::new));
     }
 }

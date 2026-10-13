@@ -9,9 +9,9 @@ import com.noxcrew.noxesium.api.network.NoxesiumNetworking;
 import com.noxcrew.noxesium.api.nms.NoxesiumPlatform;
 import com.noxcrew.noxesium.core.fabric.config.NoxesiumConfig;
 import com.noxcrew.noxesium.core.fabric.feature.CustomServerCreativeItems;
+import com.noxcrew.noxesium.core.fabric.feature.NoxesiumKeybinds;
 import com.noxcrew.noxesium.core.fabric.network.FabricNoxesiumClientHandshaker;
 import com.noxcrew.noxesium.core.fabric.network.FabricNoxesiumServerboundNetworking;
-import com.noxcrew.noxesium.core.fabric.util.BackgroundTaskFeature;
 import com.noxcrew.noxesium.core.network.serverbound.ServerboundMouseButtonClickPacket;
 import java.util.HashSet;
 import java.util.Queue;
@@ -20,7 +20,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -38,6 +37,7 @@ public class NoxesiumMod implements ClientModInitializer {
 
     private final NoxesiumConfig config;
     private CustomServerCreativeItems customCreativeItems;
+    private NoxesiumKeybinds keybinds;
 
     /**
      * Whether the creative tab has changed.
@@ -75,6 +75,7 @@ public class NoxesiumMod implements ClientModInitializer {
     public void onInitializeClient() {
         // Initialize creative tab when the client is ready
         customCreativeItems = new CustomServerCreativeItems();
+        keybinds = new NoxesiumKeybinds();
 
         // Go through all entrypoints and register them
         var logger = NoxesiumApi.getLogger();
@@ -94,37 +95,6 @@ public class NoxesiumMod implements ClientModInitializer {
         // Set up the initializer
         handshaker = new FabricNoxesiumClientHandshaker();
         handshaker.register();
-
-        // Run rebuilds on a separate thread to not destroy fps unnecessarily.
-        var backgroundTaskThread = new Thread("Noxesium Background Task Thread") {
-            @Override
-            public void run() {
-                while (true) {
-                    try {
-                        // Run all background features
-                        NoxesiumApi.getInstance().getAllFeatures().forEach(feature -> {
-                            if (feature instanceof BackgroundTaskFeature backgroundTaskFeature) {
-                                backgroundTaskFeature.runAsync();
-                            }
-                        });
-
-                        // Tick the custom elytra coyote time
-                        var player = Minecraft.getInstance().player;
-                        if (player != null) {
-                            player.noxesium$checkCoyoteTime();
-                        }
-
-                        Thread.sleep(5);
-                    } catch (InterruptedException ex) {
-                        return;
-                    } catch (Exception ex) {
-                        logger.error("Caught exception from Noxesium Background Task Thread", ex);
-                    }
-                }
-            }
-        };
-        backgroundTaskThread.setDaemon(true);
-        backgroundTaskThread.start();
 
         ClientTickEvents.END_CLIENT_TICK.register((ignored2) -> {
             // Clear the packet list every tick
@@ -160,6 +130,13 @@ public class NoxesiumMod implements ClientModInitializer {
      */
     public CustomServerCreativeItems getCustomCreativeItems() {
         return customCreativeItems;
+    }
+
+    /**
+     * Returns the custom keybinds.
+     */
+    public NoxesiumKeybinds getKeybinds() {
+        return keybinds;
     }
 
     /**

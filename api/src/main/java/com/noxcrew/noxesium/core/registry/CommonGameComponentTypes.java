@@ -112,11 +112,48 @@ public class CommonGameComponentTypes {
             register("client_authoritative_elytra", Unit.class);
 
     /**
-     * Sets the amount of ticks the client authoritative elytra has coyote time for.
-     * This allows players to hop around with the elytra which is possible in vanilla
-     * on higher ping.
+     * Sets the amount of ticks the client authoritative elytra has coyote time for
+     * in milliseconds.
      */
-    public static NoxesiumComponentType<Double> ELYTRA_COYOTE_TIME = register("elytra_coyote_time", Double.class);
+    public static NoxesiumComponentType<Long> ELYTRA_COYOTE_TIME_MS = register("elytra_coyote_time_ms", Long.class);
+
+    /**
+     * Fully disables all debug renderers that the client may have enabled.
+     */
+    public static NoxesiumComponentType<Unit> DISABLE_ALL_DEBUG_RENDERERS =
+            register("disable_all_debug_renderers", Unit.class);
+
+    /**
+     * A list of debug entries to allow if they are otherwise denied by vanilla.
+     */
+    public static NoxesiumComponentType<List<String>> DEBUG_ENTRIES_ALLOWED =
+            register("debug_entries_allowed", List.class);
+
+    /**
+     * A list of debug entries to deny if they are otherwise allowed by vanilla.
+     */
+    public static NoxesiumComponentType<List<String>> DEBUG_ENTRIES_DENIED =
+            register("debug_entries_denied", List.class);
+
+    /**
+     * A list of debug entries to allow. If set, this completely overrides the
+     * vanilla logic for allowing or denying entries.
+     */
+    public static NoxesiumComponentType<List<String>> DEBUG_ENTRIES_OVERRIDE =
+            register("debug_entries_override", List.class);
+
+    /**
+     * Hides the yaw from the minecraft:position debug screen entry. Can be used to avoid
+     * players from using specific practiced angles if undesired.
+     */
+    public static NoxesiumComponentType<Unit> DEBUG_POSITION_HIDE_YAW = register("debug_position_hide_yaw", Unit.class);
+
+    /**
+     * Hides the pitch from the minecraft:position debug screen entry. Can be used to avoid
+     * players from using specific practiced angles if undesired.
+     */
+    public static NoxesiumComponentType<Unit> DEBUG_POSITION_HIDE_PITCH =
+            register("debug_position_hide_pitch", Unit.class);
 
     /**
      * Registers a new component type to the registry.

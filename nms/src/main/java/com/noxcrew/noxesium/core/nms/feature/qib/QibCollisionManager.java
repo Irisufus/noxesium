@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.kyori.adventure.key.Key;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.player.Player;
@@ -18,6 +19,7 @@ import net.minecraft.world.phys.Vec3;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Vector3d;
 
 /**
  * Assists in executing the behaviors for qibs for a specific entity.
@@ -278,7 +280,8 @@ public abstract class QibCollisionManager {
                             case IS_ON_GROUND -> player.onGround();
                             case IS_IN_WATER -> player.isInWater();
                             case IS_IN_WATER_OR_RAIN -> player.isInWaterOrRain();
-                            case IS_IN_VEHICLE -> player.getVehicle() != null;
+                            case IS_IN_VEHICLE -> player.isPassenger();
+                            case IS_FLYING -> player.getAbilities().flying;
                         };
 
                 // Trigger the effect if it matches
@@ -291,6 +294,7 @@ public abstract class QibCollisionManager {
             }
             case QibEffect.SetVelocity setVelocity -> {
                 player.setDeltaMovement(setVelocity.x(), setVelocity.y(), setVelocity.z());
+                player.syncVelocity = true;
                 player.needsSync = true;
             }
             case QibEffect.SetVelocityYawPitch setVelocityYawPitch -> {
@@ -316,6 +320,7 @@ public abstract class QibCollisionManager {
                                 -setVelocityYawPitch.limit(),
                                 setVelocityYawPitch.limit()));
                 player.needsSync = true;
+                player.syncVelocity = true;
             }
             case QibEffect.ModifyVelocity modifyVelocity -> {
                 var current = player.getDeltaMovement();
@@ -323,16 +328,18 @@ public abstract class QibCollisionManager {
                         modifyVelocity.xOp().apply(current.x, modifyVelocity.x()),
                         modifyVelocity.yOp().apply(current.y, modifyVelocity.y()),
                         modifyVelocity.zOp().apply(current.z, modifyVelocity.z()));
+                player.syncVelocity = true;
                 player.needsSync = true;
             }
             case QibEffect.ApplyImpulse applyImpulse -> {
                 var direction = applyImpulse.direction();
                 var scale = applyImpulse.scale();
-                var lookAngle = player.getLookAngle();
+                var lookAngle = player.getLookQuaternion();
                 var impulse = lookAngle
-                        .addLocalCoordinates(new Vec3(direction.x, direction.y, direction.z))
-                        .multiply(new Vec3(scale.x, scale.y, scale.z));
-                player.addDeltaMovement(impulse);
+                        .transform(direction.x, direction.y, direction.z, new Vector3d())
+                        .mul(scale.x, scale.y, scale.z);
+                player.addDeltaMovement(new Vec3(impulse.x, impulse.y, impulse.z));
+                player.syncVelocity = true;
                 player.needsSync = true;
             }
             case QibEffect.StartGliding startGliding -> {
@@ -344,6 +351,28 @@ public abstract class QibCollisionManager {
             }
             case QibEffect.StopGliding stopGliding -> {
                 player.stopFallFlying();
+            }
+            case QibEffect.ConditionalMomentum conditionalMomentum -> {
+                var playerValue = conditionalMomentum
+                        .axis()
+                        .select(player.getDeltaMovement().toVector3f());
+                switch (conditionalMomentum.relative()) {
+                    case LESSER -> {
+                        if (playerValue < conditionalMomentum.value()) {
+                            executeBehavior(entity, conditionalMomentum.effect());
+                        }
+                    }
+                    case EQUAL -> {
+                        if (Mth.equal(playerValue, conditionalMomentum.value())) {
+                            executeBehavior(entity, conditionalMomentum.effect());
+                        }
+                    }
+                    case GREATER -> {
+                        if (playerValue > conditionalMomentum.value()) {
+                            executeBehavior(entity, conditionalMomentum.effect());
+                        }
+                    }
+                }
             }
             default -> throw new IllegalStateException("Unexpected value: " + effect);
         }

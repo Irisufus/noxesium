@@ -9,12 +9,13 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
 import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -26,7 +27,10 @@ import net.minecraft.client.gui.font.SingleSpriteSource;
 import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.client.renderer.PlayerSkinRenderCache;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.FontDescription;
@@ -35,7 +39,7 @@ import net.minecraft.network.chat.contents.objects.ObjectInfo;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.world.item.component.ResolvableProfile;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 
 /**
  * A custom chat component that renders a player's face at its location. The
@@ -65,6 +69,8 @@ public class SkullSprite implements ObjectInfo {
                                 Style style,
                                 float f,
                                 float shadowOffset) {
+                            // Don't render anything if the sprite is broken!
+                            if (sprite.skin == null) return null;
                             return new SpriteInstance(sprite, x, y, color, shadowColor, shadowOffset, style);
                         }
                     });
@@ -116,13 +122,15 @@ public class SkullSprite implements ObjectInfo {
         } else if (uuid.isPresent()) {
             profile = ResolvableProfile.createUnresolved(uuid.get());
         }
-        if (profile != null) {
-            this.skin = Minecraft.getInstance().playerSkinRenderCache().createLookup(profile);
+        var cache = Minecraft.getInstance().playerSkinRenderCache();
+        if (cache == null) {
+            this.skin = null;
+        } else if (profile != null) {
+            this.skin = cache.createLookup(profile);
         } else {
             var gameProfile = new GameProfile(UUID.randomUUID(), "");
             var defaultSkin = DefaultPlayerSkin.getDefaultSkin();
-            var renderInfo = Minecraft.getInstance().playerSkinRenderCache()
-            .new RenderInfo(gameProfile, defaultSkin, PlayerSkin.Patch.EMPTY);
+            var renderInfo = cache.new RenderInfo(gameProfile, defaultSkin, PlayerSkin.Patch.EMPTY);
             this.skin = () -> renderInfo;
         }
 
@@ -166,7 +174,7 @@ public class SkullSprite implements ObjectInfo {
     }
 
     @Override
-    public String description() {
+    public String defaultFallback() {
         // Never indicate whose player head it is because we want to support disguising!
         return "[player head]";
     }
@@ -181,26 +189,25 @@ public class SkullSprite implements ObjectInfo {
             implements PlainTextRenderable {
         @Override
         public void renderSprite(
-                Matrix4f matrix,
-                VertexConsumer vertexConsumer,
-                int p_443287_,
-                float p_443341_,
-                float p_443360_,
-                float p_443552_,
+                Matrix4fc pose,
+                VertexConsumer buffer,
+                int packedLightCoords,
+                float offsetX,
+                float offsetY,
+                float z,
                 int color) {
-            float f = p_443341_ + this.left();
-            float f1 = p_443341_ + this.right();
-            float f2 = p_443360_ + this.top();
-            float f3 = p_443360_ + this.bottom();
-            renderQuad(matrix, vertexConsumer, p_443287_, f, f1, f2, f3, p_443552_, color, 8.0F, 8.0F, 8, 8, 64, 64);
+            float f = offsetX + this.left();
+            float f1 = offsetX + this.right();
+            float f2 = offsetY + this.top();
+            float f3 = offsetY + this.bottom();
+            renderQuad(pose, buffer, packedLightCoords, f, f1, f2, f3, z, color, 8.0F, 8.0F, 8, 8, 64, 64);
             if (sprite.hasHat()) {
-                renderQuad(
-                        matrix, vertexConsumer, p_443287_, f, f1, f2, f3, p_443552_, color, 40.0F, 8.0F, 8, 8, 64, 64);
+                renderQuad(pose, buffer, packedLightCoords, f, f1, f2, f3, z, color, 40.0F, 8.0F, 8, 8, 64, 64);
             }
         }
 
         private static void renderQuad(
-                Matrix4f matrix,
+                Matrix4fc matrix,
                 VertexConsumer vertexConsumer,
                 int light,
                 float x0,
@@ -242,17 +249,22 @@ public class SkullSprite implements ObjectInfo {
         }
 
         @Override
-        public RenderType renderType(Font.DisplayMode p_442599_) {
-            return sprite.skin.get().glyphRenderTypes().select(p_442599_);
+        public RenderType renderType(Font.DisplayMode displayMode) {
+            if (sprite.skin == null) return RenderTypes.text(MissingTextureAtlasSprite.getLocation());
+            return sprite.skin.get().glyphRenderTypes().select(displayMode);
         }
 
         @Override
         public RenderPipeline guiPipeline() {
+            if (sprite.skin == null) return RenderPipelines.GUI_TEXT;
             return sprite.skin.get().glyphRenderTypes().guiPipeline();
         }
 
         @Override
         public GpuTextureView textureView() {
+            Objects.requireNonNull(
+                    sprite.skin,
+                    "Tried to render a skull sprite that was fetched during start-up, this is NOT an issue in Noxesium!");
             return sprite.skin.get().textureView();
         }
 

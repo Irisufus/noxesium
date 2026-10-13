@@ -3,7 +3,7 @@ package com.noxcrew.noxesium.core.fabric.feature.qib;
 import com.noxcrew.noxesium.api.feature.NoxesiumFeature;
 import com.noxcrew.noxesium.api.registry.NoxesiumRegistries;
 import com.noxcrew.noxesium.core.fabric.NoxesiumMod;
-import com.noxcrew.noxesium.core.fabric.util.BackgroundTaskFeature;
+import com.noxcrew.noxesium.core.fabric.mixin.feature.qib.ClientLevelExt;
 import com.noxcrew.noxesium.core.nms.feature.qib.QibCollisionManager;
 import com.noxcrew.noxesium.core.registry.CommonEntityComponentTypes;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -16,7 +16,7 @@ import net.minecraft.world.entity.player.Player;
 /**
  * Applies qib behaviors whenever players clip interaction entities.
  */
-public class QibBehaviorModule extends NoxesiumFeature implements BackgroundTaskFeature {
+public class QibBehaviorModule extends NoxesiumFeature {
 
     private final ClientSpatialInteractionEntityTree spatialTree = new ClientSpatialInteractionEntityTree();
     private QibCollisionManager qibCollisionManager;
@@ -52,11 +52,6 @@ public class QibBehaviorModule extends NoxesiumFeature implements BackgroundTask
     }
 
     @Override
-    public void runAsync() {
-        spatialTree.rebuild();
-    }
-
-    @Override
     public void onRegister() {
         refresh();
     }
@@ -79,7 +74,7 @@ public class QibBehaviorModule extends NoxesiumFeature implements BackgroundTask
         // Go through the level and detect all entities that already have qib data somehow!
         var level = Minecraft.getInstance().level;
         if (level == null) return;
-        for (var entity : level.getEntities().getAll()) {
+        for (var entity : ((ClientLevelExt) level).invokeGetEntities().getAll()) {
             if (entity instanceof Interaction interaction
                     && interaction.noxesium$hasComponent(CommonEntityComponentTypes.QIB_BEHAVIOR)) {
                 spatialTree.update(interaction);
@@ -89,13 +84,13 @@ public class QibBehaviorModule extends NoxesiumFeature implements BackgroundTask
         if (NoxesiumMod.getInstance().getConfig().showQibSystemDebugging()) {
             if (Minecraft.getInstance().player != null) {
                 Minecraft.getInstance()
-                        .getChatListener()
-                        .handleSystemMessage(
-                                Component.literal("§eRefreshed spatial model, before: §f[A"
-                                        + oldAddedEntities + ", R" + oldRemovingEntities + "]§e, after: §f[A"
-                                        + spatialTree.getPendingEntities().size() + ", R"
-                                        + spatialTree.getRemovedEntities().size() + "]"),
-                                false);
+                        .gui
+                        .hud
+                        .getChat()
+                        .addClientSystemMessage(Component.literal("§eRefreshed spatial model, before: §f[A"
+                                + oldAddedEntities + ", R" + oldRemovingEntities + "]§e, after: §f[A"
+                                + spatialTree.getPendingEntities().size() + ", R"
+                                + spatialTree.getRemovedEntities().size() + "]"));
             }
         }
     }
